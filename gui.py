@@ -5,7 +5,7 @@ from surface_average_comparison import Compare_Surface_Average
 from device import Device
 from graph_plotter import graph_plotter
 from PIL import Image, ImageTk
-# from gui_graph import GraphGUI, GraphItem, GraphViewer
+from GUI.pair_reviewer import PairReviewer, GraphItem
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 
 graph_types = [
@@ -186,20 +186,62 @@ class VibroGUI(Tk):
             graph_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
 
             if target == "average":
-                # Surface-average graph
-                graph_obj = measurement.get_average(g_id if units == "raw" else f"{g_id}_db")
-                # Use graph_plotter instead of plot_graph
-                fig = graph_plotter(graph_obj)  # Assuming graph_plotter returns the figure
-                
-                # Embed the figure in Tkinter
-                canvas = FigureCanvasTkAgg(fig, master=graph_frame)
-                canvas.draw()
-                canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
-                
-                # Add navigation toolbar (optional)
-                toolbar = NavigationToolbar2Tk(canvas, graph_frame)
-                toolbar.update()
-                canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+                graph_items = []
+                key_raw = g_id                         # e.g. "vib"
+                key_db  = f"{g_id}_db"                 # e.g. "vib_db"
+                key     = key_raw if units == "raw" else key_db
+
+                for i, sp in enumerate(measurement.scanpoints, start=1):
+                    try:
+                        # try attribute first, e.g. sp.vib ; else call creator
+                        if units == "raw":
+                            g_obj = getattr(sp, key_raw)
+                        else:
+                            g_obj = getattr(sp, f"create_{key_raw}_decibel")()
+                    except AttributeError:
+                        # fallback (rarely needed)
+                        g_obj = getattr(sp, key) if hasattr(sp, key) else None
+                    if g_obj is None:
+                        continue
+                    fig = graph_plotter(g_obj)
+                    graph_items.append(GraphItem(fig, f"Point {i}"))
+
+                # 2. Build reviewer page --------------------------------------------------
+
+                def build_final_average(kept_items):
+                    if not kept_items:
+                        messagebox.showwarning("No points selected",
+                                            "You excluded every scan point.")
+                        return
+                    kept_indices = [int(item.label.split()[-1]) - 1 for item in kept_items]
+
+                    # Use your existing averaging logic on the kept indices --------------
+                    graphs_to_avg = []
+                    for idx in kept_indices:
+                        sp = measurement.scanpoints[idx]
+                        g_obj = getattr(sp, key_raw) if units=="raw" else getattr(
+                                sp, f"create_{key_raw}_decibel")()
+                        graphs_to_avg.append(g_obj)
+
+                    avg_graph = Graph_average(graphs_to_avg, [])  # excluded list empty
+                    avg_fig   = graph_plotter(avg_graph)
+
+                    # Show the averaged figure on its own page ---------------------------
+                    avg_page = tk.Frame(self.container, bg="white")
+                    self.add_home_button(avg_page)
+                    tk.Label(avg_page, text="Final Average", font=("Times New Roman",16,"bold")
+                            ).pack(pady=6)
+                    can = FigureCanvasTkAgg(avg_fig, master=avg_page)
+                    can.draw()
+                    can.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+                    tk.Button(avg_page, text="Back to reviewer",
+                            command=lambda:self.show_page(graph_page),
+                            bg="#4CAF50", fg="white",
+                            font=("Times New Roman",11,"bold")).pack(pady=10)
+                    self.show_page(avg_page)
+
+                viewer = PairReviewer(graph_page, graph_items, build_final_average)
+                viewer.pack(fill="both", expand=True)
 
             else:
                 

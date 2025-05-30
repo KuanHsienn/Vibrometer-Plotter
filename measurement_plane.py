@@ -1875,8 +1875,6 @@ class Measurement_Plane:
         #return all_bands
         return all_bands
 
-
-
     def bands_layout(self):
 
         '''Method to display scatter plot of scan points with each band differentiated by colour'''
