@@ -2,11 +2,13 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk, Tk
 from measurement_plane import Measurement_Plane
 from surface_average_comparison import Compare_Surface_Average
+from scan_point_graph import Graph_average
 from device import Device
 from graph_plotter import graph_plotter
 from PIL import Image, ImageTk
 from GUI.pair_reviewer import PairReviewer, GraphItem
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
+import matplotlib.pyplot as plt
 
 graph_types = [
     "Vibration Displacement", "Vibration Velocity", "Vibration Acceleration",
@@ -45,8 +47,8 @@ class VibroGUI(Tk):
         frame.pack(expand=True, fill="both")
 
     def build_menu_page(self):
-        self.task_type = tk.StringVar(value="Chooes what type of measurement to process")
-        self.graph_unit = tk.StringVar(value="Chooes what type of measurement to process")
+        self.task_type = tk.StringVar(value="Choose what type of measurement to process")
+        self.graph_unit = tk.StringVar(value="Choose what type of measurement to process")
         self.graph_index = tk.IntVar(value=0)
 
         # Main content frame with padding and fixed width
@@ -130,15 +132,10 @@ class VibroGUI(Tk):
         tk.Label(content, text="Measurement Options", font=("Times New Roman", 16, "bold"), relief="groove", bg="#f0f0f0").pack(pady=(0, 12))
 
         # Task
-        task_var = tk.StringVar(value="display")
         unit_var = tk.StringVar(value="raw")
         tgt_var  = tk.StringVar(value="average")
         graph_var = tk.StringVar(value=graph_types[0])
         point_var = tk.StringVar(value="Point 1")
-
-        tk.Label(content, text="Task:", font=("Times New Roman", 11, "bold"), bg="#f0f0f0").pack(anchor="w")
-        for t, v in (("Display", "display"), ("Export", "export")):
-            ttk.Radiobutton(content, text=t, variable=task_var, value=v).pack(anchor="w")
 
         # Units
         tk.Label(content, text="Units:", font=("Times New Roman", 11, "bold"), bg="#f0f0f0").pack(anchor="w", pady=(8, 0))
@@ -172,41 +169,54 @@ class VibroGUI(Tk):
 
         # ---- Graph processing onto Tkinter window ----
         def run():
-            task = task_var.get()                 # "display" | "export"
+            self.current_figs = []
+
             units = unit_var.get()                # "raw" | "db"
             target = tgt_var.get()                # "average" | "scan"
-            g_id = short_graph_types[graph_types.index(graph_var.get())]
+            graph_id = short_graph_types[graph_types.index(graph_var.get())]
 
-            # Create a new frame for the graph
+            # Create a new frame for the graph page
             graph_page = tk.Frame(self.container, bg="white")
-            #self.add_home_button(graph_page)
-
-            # Create a frame to hold the graph
             graph_frame = tk.Frame(graph_page)
             graph_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
 
+            def add_nav_buttons(container, export_callback=None, back_callback=None):
+                """Add back/export buttons to the given container frame."""
+                back_frame = tk.Frame(container, bg="white")
+                back_frame.pack(fill=tk.X, padx=10, pady=10)
+
+                def back_callback():
+                    for figure in self.current_figs:
+                        plt.close(figure)
+                    self.current_figs = []
+                    self.single_measurement(False)
+
+                tk.Button(back_frame, text="Back to Measurement Options", command=back_callback,
+                        bg="#4CAF50", fg="white", font=("Times New Roman", 11, "bold")).pack(side=tk.LEFT)
+
+                if export_callback is not None:
+                    tk.Button(back_frame, text="Export", command=export_callback,
+                            bg="#4CAF50", fg="white", font=("Times New Roman", 11, "bold")).pack(side=tk.RIGHT)
+
             if target == "average":
                 graph_items = []
-                key_raw = g_id                         # e.g. "vib"
-                key_db  = f"{g_id}_db"                 # e.g. "vib_db"
-                key     = key_raw if units == "raw" else key_db
+                key_raw = graph_id
+                key_db = f"{graph_id}_db"
+                key = key_raw if units == "raw" else key_db
 
                 for i, sp in enumerate(measurement.scanpoints, start=1):
                     try:
-                        # try attribute first, e.g. sp.vib ; else call creator
                         if units == "raw":
                             g_obj = getattr(sp, key_raw)
                         else:
                             g_obj = getattr(sp, f"create_{key_raw}_decibel")()
                     except AttributeError:
-                        # fallback (rarely needed)
                         g_obj = getattr(sp, key) if hasattr(sp, key) else None
                     if g_obj is None:
                         continue
                     fig = graph_plotter(g_obj)
                     graph_items.append(GraphItem(fig, f"Point {i}"))
-
-                # 2. Build reviewer page --------------------------------------------------
+                    self.current_figs.append(fig)
 
                 def build_final_average(kept_items):
                     if not kept_items:
@@ -215,87 +225,85 @@ class VibroGUI(Tk):
                         return
                     kept_indices = [int(item.label.split()[-1]) - 1 for item in kept_items]
 
-                    # Use your existing averaging logic on the kept indices --------------
                     graphs_to_avg = []
                     for idx in kept_indices:
                         sp = measurement.scanpoints[idx]
-                        g_obj = getattr(sp, key_raw) if units=="raw" else getattr(
-                                sp, f"create_{key_raw}_decibel")()
+                        g_obj = getattr(sp, key_raw) if units == "raw" else getattr(
+                            sp, f"create_{key_raw}_decibel")()
                         graphs_to_avg.append(g_obj)
 
-                    avg_graph = Graph_average(graphs_to_avg, [])  # excluded list empty
-                    avg_fig   = graph_plotter(avg_graph)
+                    avg_graph = Graph_average(graphs_to_avg, [])
+                    avg_fig = graph_plotter(avg_graph)
 
-                    # Show the averaged figure on its own page ---------------------------
                     avg_page = tk.Frame(self.container, bg="white")
-                    self.add_home_button(avg_page)
-                    tk.Label(avg_page, text="Final Average", font=("Times New Roman",16,"bold")
-                            ).pack(pady=6)
-                    can = FigureCanvasTkAgg(avg_fig, master=avg_page)
+                    avg_frame = tk.Frame(avg_page, bg="white")
+                    avg_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+
+                    tk.Label(avg_frame, text="Final Average", font=("Times New Roman", 16, "bold")).pack(pady=(12, 6))
+
+                    can = FigureCanvasTkAgg(avg_fig, master=avg_frame)
                     can.draw()
                     can.get_tk_widget().pack(fill=tk.BOTH, expand=True)
-                    tk.Button(avg_page, text="Back to reviewer",
-                            command=lambda:self.show_page(graph_page),
+
+                    def export_average():
+                        exported_name = avg_graph.gui_export()  # or your avg_fig export method
+
+                    # Back to reviewer page button uses show_page(graph_page)
+                    tk.Button(avg_frame, text="Back to reviewer",
+                            command=lambda: self.show_page(graph_page),
                             bg="#4CAF50", fg="white",
-                            font=("Times New Roman",11,"bold")).pack(pady=10)
+                            font=("Times New Roman", 11, "bold")).pack(pady=10)
+
+                    # Add back/export buttons here too
+                    add_nav_buttons(avg_page, export_callback=export_average,
+                                    back_callback=lambda: self.show_page(graph_page))
+
                     self.show_page(avg_page)
 
-                viewer = PairReviewer(graph_page, graph_items, build_final_average)
+                viewer = PairReviewer(graph_frame, graph_items, build_final_average)
                 viewer.pack(fill="both", expand=True)
 
+                # Add back/export buttons to main graph_page (reviewer)
+                add_nav_buttons(graph_page)
+
             else:
-                
                 # Single scan-point graph
                 raw, decibel = {
-                    "disp":     ("disp",             "create_disp_decibel"),
-                    "vib":      ("vib",              "create_vib_decibel"),
-                    "acc":      ("acc",              "create_acc_decibel"),
-                    "ref1":     ("ref1",             "create_ref1_decibel"),
-                    "ref2":     ("ref2",             "create_ref2_decibel"),
-                    "ref3":     ("ref3",             "create_ref3_decibel"),
-                    "h1vibref1":("h1vibref1",        "create_h1vibref1_decibel"),
-                    "h2vibref1":("h2vibref1",        "create_h2vibref1_decibel"),
-                    "vibref1":  ("create_vibref1",   "create_vibref1_decibel"),
-                    "vibref2":  ("create_vibref2",   "create_vibref2_decibel"),
-                    "vibref3":  ("create_vibref3",   "create_vibref3_decibel")
-                }[g_id]
+                    "disp": ("disp", "create_disp_decibel"),
+                    "vib": ("vib", "create_vib_decibel"),
+                    "acc": ("acc", "create_acc_decibel"),
+                    "ref1": ("ref1", "create_ref1_decibel"),
+                    "ref2": ("ref2", "create_ref2_decibel"),
+                    "ref3": ("ref3", "create_ref3_decibel"),
+                    "h1vibref1": ("h1vibref1", "create_h1vibref1_decibel"),
+                    "h2vibref1": ("h2vibref1", "create_h2vibref1_decibel"),
+                    "vibref1": ("create_vibref1", "create_vibref1_decibel"),
+                    "vibref2": ("create_vibref2", "create_vibref2_decibel"),
+                    "vibref3": ("create_vibref3", "create_vibref3_decibel")
+                }[graph_id]
 
-                idx = int(point_var.get().split()[1]) - 1     # Format of point_var -> Point <index>  
+                idx = int(point_var.get().split()[1]) - 1
                 sp = measurement.scanpoints[idx]
                 graph_obj = getattr(sp, raw) if units == "raw" else getattr(sp, decibel)()
                 fig = graph_plotter(graph_obj)
-                
-                # Embed the figure in Tkinter
+                self.current_figs.append(fig)
+
                 canvas = FigureCanvasTkAgg(fig, master=graph_frame)
                 canvas.draw()
                 canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
-                
-                # Add navigation toolbar (optional)
+
                 toolbar = NavigationToolbar2Tk(canvas, graph_frame)
                 toolbar.update()
                 canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
 
+                def export_single():
+                    exported_name = graph_obj.gui_export()
 
-            # Back button
-            back_frame = tk.Frame(graph_page, bg="white")
-            back_frame.pack(fill=tk.X, padx=10, pady=10)
-            
-            def back_action():
-                self.single_measurement(False)
+                # Add back/export buttons to graph_page
+                add_nav_buttons(graph_page, export_callback=export_single)
 
-            def export():
-                exported_name = graph_obj.gui_export()
-
-            if task == "export":
-                tk.Button(back_frame, text="Export", command=export,
-                    bg="#4CAF50", fg="white", font=("Times New Roman", 11, "bold")).pack(side=tk.RIGHT)
-
-
-            tk.Button(back_frame, text="Back to Measurement Options", command=back_action,
-                    bg="#4CAF50", fg="white", font=("Times New Roman", 11, "bold")).pack(side=tk.LEFT)
-
-            # Show the graph page
             self.show_page(graph_page)
+
 
         # Run button
         tk.Button(content, text="Run", bg="#4CAF50", fg="white",

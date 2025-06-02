@@ -101,59 +101,6 @@ class Graph:
         #return just file name without folder directory and extension
         return file_name_without_extension
 
-
-    def plot_graph(self):
-
-        '''Method to save as HXML file, save as png and also display the current graph'''
-
-        #export as HXML and get the user chosen file name
-        default_file_name = self.export_graph()
-
-
-        #use this to get the message box and file dialog to show as top windows later
-        window = Tk()
-        window.wm_attributes('-topmost', 1)
-
-        #suppress the Tk window
-        window.withdraw()
-
-        #loop until user chooses a filename
-        valid_filename = False
-
-        while not valid_filename:
-
-            #display a message box
-            messagebox.showinfo("Save Graph as Photo", "Choose Folder to Save Graph Photo in", parent =window)
-
-            #get user to choose name and folder location to save photo file in
-            user_filename = filedialog.asksaveasfilename(parent = window, initialdir = "C:\\", initialfile = default_file_name, filetypes = [(".png", "*.png")], defaultextension = ".png", confirmoverwrite = True)
-
-            #valid filename that is not empty
-            if user_filename != "":
-                
-                #exit loop
-                valid_filename = True
-
-            #invalid filename
-            else:
-                
-                #display error message
-                print("Please provide a filename to save as")
-
-                #repeat the prompt for user to choose a filename
-                valid_filename = False
-
-
-        #plot the graph using imported graph_plotter functions
-        graph_plotter(self)
-
-        #save the plot as a png image, adapted from Kuan Hsien code line for savefig
-        plt.savefig(user_filename, dpi=300, bbox_inches="tight")
-
-        #display the graph
-        plt.show()
-
-
     def gui_export(self):
         '''Export both hxml file and graph png'''
         #export as HXML and get the user chosen file name
@@ -200,6 +147,12 @@ class Graph:
         #save the plot as a png image, adapted from Kuan Hsien code line for savefig
         plt.savefig(user_filename, dpi=300, bbox_inches="tight")
 
+    def plot_graph(self):
+
+        self.gui_export()
+
+        #display the graph
+        plt.show()
 
 #class for an individual graph for one channel type, one signal type, and one scan point, converted to decibel
 #takes in a Graph object and the decibel reference as input parameters
@@ -318,7 +271,7 @@ class Graph_decibel:
         return file_name_without_extension
 
 
-    def plot_graph(self):
+    def gui_export(self):
 
         '''Method to save as HXML file, save as png and also display the current graph'''
 
@@ -365,6 +318,9 @@ class Graph_decibel:
 
         #save the plot as a png image, adapted from Kuan Hsien code line for savefig
         plt.savefig(user_filename, dpi=300, bbox_inches="tight")
+
+    def plot_graph(self):
+        self.gui_export()
 
         #display the graph
         plt.show()
@@ -583,7 +539,7 @@ class Graph_quotient:
         return file_name_without_extension
 
 
-    def plot_graph(self):
+    def gui_export(self):
 
         '''Method to save as HXML file, save as png and also display the current graph'''
 
@@ -630,6 +586,9 @@ class Graph_quotient:
 
         #save the plot as a png image, adapted from Kuan Hsien code line for savefig
         plt.savefig(user_filename, dpi=300, bbox_inches="tight")
+
+    def plot_graph(self):
+        self.gui_export()
 
         #display the graph
         plt.show()
@@ -806,7 +765,7 @@ class Graph_average:
         return file_name_without_extension
     
 
-    def plot_graph(self):
+    def gui_export(self):
 
         '''Method to save as HXML file, save as png and also display the current graph'''
 
@@ -853,6 +812,9 @@ class Graph_average:
 
         #save the plot as a png image, adapted from Kuan Hsien code line for savefig
         plt.savefig(user_filename, dpi=300, bbox_inches="tight")
+
+    def plot_graph(self):
+        self.gui_export()
 
         #display the graph
         plt.show()
@@ -1021,7 +983,7 @@ class Graph_average_all:
         return file_name_without_extension
     
 
-    def plot_graph(self):
+    def gui_export(self):
 
         '''Method to save as HXML file, save as png and also display the current graph'''
 
@@ -1068,6 +1030,9 @@ class Graph_average_all:
 
         #save the plot as a png image, adapted from Kuan Hsien code line for savefig
         plt.savefig(user_filename, dpi=300, bbox_inches="tight")
+
+    def plot_graph(self):
+        self.gui_export()
 
         #display the graph
         plt.show()
@@ -1252,7 +1217,7 @@ class Graph_perc_change:
         return file_name_without_extension
 
 
-    def plot_graph(self):
+    def gui_export(self):
 
         '''Method to save as HXML file, save as png and also display the current graph'''
 
@@ -1300,5 +1265,8 @@ class Graph_perc_change:
         #save the plot as a png image, adapted from Kuan Hsien code line for savefig
         plt.savefig(user_filename, dpi=300, bbox_inches="tight")
 
+    def plot_graph(self):
+        self.gui_export()
+        
         #display the graph
         plt.show()
