@@ -35,6 +35,9 @@ class VibroGUI(Tk):
         img_resized = img.resize((75, 75), Image.LANCZOS)  
         self.home_img = ImageTk.PhotoImage(img_resized)   
 
+        # Graph figs
+        self.current_figs = []
+
         # Initialise variables for UFF files
         self.single_file_path = ""
 
@@ -95,6 +98,24 @@ class VibroGUI(Tk):
                 self.export_device()
             case _:
                 messagebox.showerror("Invalid", "Unknown task type.")
+
+    def add_nav_buttons(self, container, export_callback=None, back_callback=None):
+        """Add back/export buttons to the given container frame."""
+        back_frame = tk.Frame(container, bg="white")
+        back_frame.pack(fill=tk.X, padx=10, pady=10)
+
+        def back_callback():
+            for figure in self.current_figs:
+                plt.close(figure)
+            self.current_figs = []
+            self.single_measurement(False)
+
+        tk.Button(back_frame, text="Back to Measurement Options", command=back_callback,
+                bg="#4CAF50", fg="white", font=("Times New Roman", 11, "bold")).pack(side=tk.LEFT)
+
+        if export_callback is not None:
+            tk.Button(back_frame, text="Export", command=export_callback,
+                    bg="#4CAF50", fg="white", font=("Times New Roman", 11, "bold")).pack(side=tk.RIGHT)
 
     def single_measurement(self, is_new_instance=True):
         if is_new_instance:
@@ -169,7 +190,6 @@ class VibroGUI(Tk):
 
         # ---- Graph processing onto Tkinter window ----
         def run():
-            self.current_figs = []
 
             units = unit_var.get()                # "raw" | "db"
             target = tgt_var.get()                # "average" | "scan"
@@ -179,26 +199,10 @@ class VibroGUI(Tk):
             graph_page = tk.Frame(self.container, bg="white")
             graph_frame = tk.Frame(graph_page)
             graph_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
-
-            def add_nav_buttons(container, export_callback=None, back_callback=None):
-                """Add back/export buttons to the given container frame."""
-                back_frame = tk.Frame(container, bg="white")
-                back_frame.pack(fill=tk.X, padx=10, pady=10)
-
-                def back_callback():
-                    for figure in self.current_figs:
-                        plt.close(figure)
-                    self.current_figs = []
-                    self.single_measurement(False)
-
-                tk.Button(back_frame, text="Back to Measurement Options", command=back_callback,
-                        bg="#4CAF50", fg="white", font=("Times New Roman", 11, "bold")).pack(side=tk.LEFT)
-
-                if export_callback is not None:
-                    tk.Button(back_frame, text="Export", command=export_callback,
-                            bg="#4CAF50", fg="white", font=("Times New Roman", 11, "bold")).pack(side=tk.RIGHT)
-
+            
             if target == "average":
+                channel_signal_type = graph_id if units == "raw" else f"{graph_id}_db"
+
                 graph_items = []
                 key_raw = graph_id
                 key_db = f"{graph_id}_db"
@@ -223,30 +227,35 @@ class VibroGUI(Tk):
                         messagebox.showwarning("No points selected",
                                             "You excluded every scan point.")
                         return
-                    kept_indices = [int(item.label.split()[-1]) - 1 for item in kept_items]
+                    
+                    kept_indices = [int(item.label.split()[-1]) for item in kept_items]
+                    all_indices = list(range(1, len(measurement.scanpoints) + 1))
+                    anomaly_indices = [i for i in all_indices if i not in kept_indices]
 
-                    graphs_to_avg = []
-                    for idx in kept_indices:
-                        sp = measurement.scanpoints[idx]
-                        g_obj = getattr(sp, key_raw) if units == "raw" else getattr(
-                            sp, f"create_{key_raw}_decibel")()
-                        graphs_to_avg.append(g_obj)
+                    try:
+                        avg_graph = measurement.get_average(channel_signal_type,
+                                            anomaly_indices=anomaly_indices)
+                    except:
+                        messagebox.showerror("Averaging Failed",
+                                            "Could not compute an average graph.")
+                        return
 
-                    avg_graph = Graph_average(graphs_to_avg, [])
                     avg_fig = graph_plotter(avg_graph)
+                    self.current_figs.append(avg_fig)
 
+                    # Average Graph Page Layout
                     avg_page = tk.Frame(self.container, bg="white")
                     avg_frame = tk.Frame(avg_page, bg="white")
                     avg_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
 
-                    tk.Label(avg_frame, text="Final Average", font=("Times New Roman", 16, "bold")).pack(pady=(12, 6))
+                    tk.Label(avg_frame, text="Final Average", bg="white", font=("Times New Roman", 16, "bold")).pack(pady=(12, 6))
 
                     can = FigureCanvasTkAgg(avg_fig, master=avg_frame)
                     can.draw()
                     can.get_tk_widget().pack(fill=tk.BOTH, expand=True)
 
                     def export_average():
-                        exported_name = avg_graph.gui_export()  # or your avg_fig export method
+                        avg_graph.gui_export()  # or your avg_fig export method
 
                     # Back to reviewer page button uses show_page(graph_page)
                     tk.Button(avg_frame, text="Back to reviewer",
@@ -254,8 +263,7 @@ class VibroGUI(Tk):
                             bg="#4CAF50", fg="white",
                             font=("Times New Roman", 11, "bold")).pack(pady=10)
 
-                    # Add back/export buttons here too
-                    add_nav_buttons(avg_page, export_callback=export_average,
+                    self.add_nav_buttons(avg_page, export_callback=export_average,
                                     back_callback=lambda: self.show_page(graph_page))
 
                     self.show_page(avg_page)
@@ -264,7 +272,7 @@ class VibroGUI(Tk):
                 viewer.pack(fill="both", expand=True)
 
                 # Add back/export buttons to main graph_page (reviewer)
-                add_nav_buttons(graph_page)
+                self.add_nav_buttons(graph_page)
 
             else:
                 # Single scan-point graph
@@ -300,7 +308,7 @@ class VibroGUI(Tk):
                     exported_name = graph_obj.gui_export()
 
                 # Add back/export buttons to graph_page
-                add_nav_buttons(graph_page, export_callback=export_single)
+                self.add_nav_buttons(graph_page, export_callback=export_single)
 
             self.show_page(graph_page)
 

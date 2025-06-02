@@ -1430,255 +1430,62 @@ class Measurement_Plane:
     
     
 
-    def get_average(self, channel_signal_type):
+    def get_average(self, channel_signal_type: str, anomaly_indices=[]):
+        """
+        Return a single-point graph or a Graph_average of all non-anomalous points
+        for the requested channel (raw or *_db).  If every point is anomalous
+        return False.
+        """
 
-        '''Method to display all the scan point graphs for the chosen channel signal type
-        and allow user to specify which points to exclude as anomalous data. 
-        Displays graphs for 2 scan points at a time, then allows user to type in whether any of them are anomalous. 
-        Then computes an average of the remaining scan point graphs and returns it as a Graph_average object. 
-        If all the scan points are anomalous, returns False'''
+        table = {
+            "disp"      : ("disp",            "create_disp_decibel"),
+            "vib"       : ("vib",             "create_vib_decibel"),
+            "acc"       : ("acc",             "create_acc_decibel"),
+            "ref1"      : ("ref1",            "create_ref1_decibel"),
+            "ref2"      : ("ref2",            "create_ref2_decibel"),
+            "ref3"      : ("ref3",            "create_ref3_decibel"),
+            "h1vibref1" : ("h1vibref1",       "create_h1vibref1_decibel"),
+            "h2vibref1" : ("h2vibref1",       "create_h2vibref1_decibel"),
+            "vibref1"   : ("create_vibref1",  "create_vibref1_decibel"),
+            "vibref2"   : ("create_vibref2",  "create_vibref2_decibel"),
+            "vibref3"   : ("create_vibref3",  "create_vibref3_decibel"),
+        }
 
+        # helper to fetch the correct graph from one ScanPoint ----------------
+        def _get_graph(scanpoint, channel: str):
+            raw_name, db_name = table[channel.replace("_db", "")]
+            if channel.endswith("_db"):
+                return getattr(scanpoint, db_name)()
+            # raw
+            return getattr(scanpoint, raw_name)
 
-        #eet anomalous points to exclude for the surface
-        anomalous_points_to_exclude = self.get_anomalous(channel_signal_type)
-        
-        #create a list to hold graphs for averaging, excluding graphs for anomalous points
-        graphs_to_avg = []
-
-        #if there is only one scan point
-        if self.number_of_scan_points == 1:
-            
-            #if the scan point is also anomalous
-            if len(anomalous_points_to_exclude) == 1:
-            
-                #all the scan points in the measurement are anomalous
-                print(f"Error: The only scan point in {self.scan_name[:-4]} has anomalous data and will not be used.")
-                print()
-
-                return False
-        
-            #if the scan point is not anomalous
-            else: 
-
-                #no need to average because there is only one scan point in the measurement
-                #get graph for the required channel signal for the scan point
-                match channel_signal_type:
-
-                    case "disp":
-            
-                        scan_point_graph_1 = self.scanpoints[0].disp
-
-                    case "vib":
-            
-                        scan_point_graph_1 = self.scanpoints[0].vib
-
-                    case "acc":
-            
-                        scan_point_graph_1 = self.scanpoints[0].acc
-
-                    case "ref1":
-
-                        scan_point_graph_1 = self.scanpoints[0].ref1
-
-                    case "ref2":
-            
-                        scan_point_graph_1 = self.scanpoints[0].ref2
-
-                    case "ref3":
-            
-                        scan_point_graph_1 = self.scanpoints[0].ref3
-
-                    case "h1vibref1":
-            
-                        scan_point_graph_1 = self.scanpoints[0].h1vibref1
-
-                    case "h2vibref1":
-            
-                        scan_point_graph_1 = self.scanpoints[0].h2vibref1
-
-                    case "vibref1":
-            
-                        scan_point_graph_1 = self.scanpoints[0].create_vibref1()
-
-                    case "vibref2":
-            
-                        scan_point_graph_1 = self.scanpoints[0].create_vibref2()
-            
-                    case "vibref3":
-            
-                        scan_point_graph_1 = self.scanpoints[0].create_vibref3()
-
-                    case "disp_db":
-            
-                        scan_point_graph_1 = self.scanpoints[0].create_disp_decibel()
-
-                    case "vib_db":
-            
-                        scan_point_graph_1 = self.scanpoints[0].create_vib_decibel()
-
-                    case "acc_db":
-            
-                        scan_point_graph_1 = self.scanpoints[0].create_acc_decibel()
-
-                    case "ref1_db":
-
-                        scan_point_graph_1 = self.scanpoints[0].create_ref1_decibel()
-
-                    case "ref2_db":
-            
-                        scan_point_graph_1 = self.scanpoints[0].create_ref2_decibel()
-
-                    case "ref3_db":
-            
-                        scan_point_graph_1 = self.scanpoints[0].create_ref3_decibel()
-
-                    case "h1vibref1_db":
-            
-                        scan_point_graph_1 = self.scanpoints[0].create_h1vibref1_decibel()
-
-                    case "h2vibref1_db":
-            
-                        scan_point_graph_1 = self.scanpoints[0].create_h2vibref1_decibel()
-
-                    case "vibref1_db":
-            
-                        scan_point_graph_1 = self.scanpoints[0].create_vibref1_decibel()
-
-                    case "vibref2_db":
-            
-                        scan_point_graph_1 = self.scanpoints[0].create_vibref2_decibel()
-            
-                    case "vibref3_db":
-            
-                        scan_point_graph_1 = self.scanpoints[0].create_vibref3_decibel()
-
-
-                #return the required channel signal graph for this point
-                return scan_point_graph_1
-
-
-        #there are more than one scan points
+        if anomaly_indices:
+            anomalous = anomaly_indices
         else:
+            anomalous = set(self.get_anomalous(channel_signal_type))   # point numbers
+        if len(anomalous) == self.number_of_scan_points:
+            print(f"Error: All scan-points in {self.scan_name[:-4]} are anomalous.")
+            return False
 
-            #all scanpoints are anomalous
-            if len(anomalous_points_to_exclude) == self.number_of_scan_points:
-
-                #all scan points in the measurement are anomalous
-                print(f"Error: All the scan points in {self.scan_name[:-4]} are anomalous and will not be used.")
-                print()
-
+        if self.number_of_scan_points == 1:
+            if 1 in anomalous:
+                print(f"Error: The only scan-point is anomalous in {self.scan_name[:-4]}")
                 return False
-            
+            return _get_graph(self.scanpoints[0], channel_signal_type)
 
-            #there are valid scanpoints
-            else:
+        graphs_to_avg = [
+            _get_graph(sp, channel_signal_type)
+            for sp in self.scanpoints
+            if sp.scan_point_no not in anomalous
+        ]
 
-                #loop through all the scanpoints and append their required channel signal graph to a list for averaging
-                for point in self.scanpoints:
+        # safety: should never be empty here, but guard anyway
+        if not graphs_to_avg:
+            print(f"Error: No valid scan-points left in {self.scan_name[:-4]}")
+            return False
 
-                    #if the point is not anomalous
-                    if point.scan_point_no not in anomalous_points_to_exclude:
-
-                        #append the required channel signal graph for the point to the list for averaging
-                        match channel_signal_type:
-
-                            case "disp":
-                    
-                                graphs_to_avg.append(point.disp)
-
-                            case "vib":
-                    
-                                graphs_to_avg.append(point.vib)
-
-                            case "acc":
-                    
-                                graphs_to_avg.append(point.acc)
-
-                            case "ref1":
-
-                                graphs_to_avg.append(point.ref1)
-
-                            case "ref2":
-                    
-                                graphs_to_avg.append(point.ref2)
-
-                            case "ref3":
-                    
-                                graphs_to_avg.append(point.ref3)
-
-                            case "h1vibref1":
-                    
-                                graphs_to_avg.append(point.h1vibref1)
-
-                            case "h2vibref1":
-                    
-                                graphs_to_avg.append(point.h2vibref1)
-
-                            case "vibref1":
-                    
-                                graphs_to_avg.append(point.create_vibref1())
-
-                            case "vibref2":
-                    
-                                graphs_to_avg.append(point.create_vibref2())
-                    
-                            case "vibref3":
-                    
-                                graphs_to_avg.append(point.create_vibref3())
-
-                            case "disp_db":
-                    
-                                graphs_to_avg.append(point.create_disp_decibel())
-
-                            case "vib_db":
-                    
-                                graphs_to_avg.append(point.create_vib_decibel())
-
-                            case "acc_db":
-                    
-                                graphs_to_avg.append(point.create_acc_decibel())
-
-                            case "ref1_db":
-
-                                graphs_to_avg.append(point.create_ref1_decibel())
-
-                            case "ref2_db":
-                    
-                                graphs_to_avg.append(point.create_ref2_decibel())
-
-                            case "ref3_db":
-                    
-                                graphs_to_avg.append(point.create_ref3_decibel())
-
-                            case "h1vibref1_db":
-                    
-                                graphs_to_avg.append(point.create_h1vibref1_decibel())
-
-                            case "h2vibref1_db":
-                    
-                                graphs_to_avg.append(point.create_h2vibref1_decibel())
-
-                            case "vibref1_db":
-                    
-                                graphs_to_avg.append(point.create_vibref1_decibel())
-
-                            case "vibref2_db":
-                    
-                                graphs_to_avg.append(point.create_vibref2_decibel())
-                    
-                            case "vibref3_db":
-                    
-                                graphs_to_avg.append(point.create_vibref3_decibel())
-
-
-                #create a graph oject that is the average of all the graphs 
-                #for the required channel signal for all the non anomalous scan points
-                average_graph = Graph_average(graphs_to_avg, anomalous_points_to_exclude)
-
-                #return the graph object
-                return average_graph
-        
-
+        # build averaged graph 
+        return Graph_average(graphs_to_avg, list(anomalous))
 
     def create_bands(self, channel_signal_type):
 
