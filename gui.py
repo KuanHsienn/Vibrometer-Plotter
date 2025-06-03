@@ -222,42 +222,37 @@ class VibroGUI(Tk):
                     graph_items.append(GraphItem(fig, f"Point {i}"))
                     self.current_figs.append(fig)
 
-                def build_final_average(kept_items):
+                def build_final_average(kept_items, anomalous_indices):
                     if not kept_items:
-                        messagebox.showwarning("No points selected",
-                                            "You excluded every scan point.")
+                        messagebox.showwarning("No points selected", "You excluded every scan point.")
                         return
-                    
-                    kept_indices = [int(item.label.split()[-1]) for item in kept_items]
-                    all_indices = list(range(1, len(measurement.scanpoints) + 1))
-                    anomaly_indices = [i for i in all_indices if i not in kept_indices]
+
 
                     try:
-                        avg_graph = measurement.get_average(channel_signal_type,
-                                            anomaly_indices=anomaly_indices)
-                    except:
-                        messagebox.showerror("Averaging Failed",
-                                            "Could not compute an average graph.")
+                        # Step 3: Call CLI-style averaging method
+                        avg_graph = measurement.get_average(key, anomalous_indices=anomalous_indices)
+                    except Exception as e:
+                        messagebox.showerror("Averaging Failed", f"An error occurred while averaging:\n{str(e)}")
                         return
 
                     avg_fig = graph_plotter(avg_graph)
                     self.current_figs.append(avg_fig)
 
-                    # Average Graph Page Layout
+                    # Step 4: Create new page to show the average
                     avg_page = tk.Frame(self.container, bg="white")
                     avg_frame = tk.Frame(avg_page, bg="white")
                     avg_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
 
-                    tk.Label(avg_frame, text="Final Average", bg="white", font=("Times New Roman", 16, "bold")).pack(pady=(12, 6))
+                    tk.Label(avg_frame, text="Final Average", bg="white",
+                            font=("Times New Roman", 16, "bold")).pack(pady=(12, 6))
 
-                    can = FigureCanvasTkAgg(avg_fig, master=avg_frame)
-                    can.draw()
-                    can.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+                    canvas = FigureCanvasTkAgg(avg_fig, master=avg_frame)
+                    canvas.draw()
+                    canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
 
                     def export_average():
-                        avg_graph.gui_export()  # or your avg_fig export method
+                        avg_graph.gui_export()
 
-                    # Back to reviewer page button uses show_page(graph_page)
                     tk.Button(avg_frame, text="Back to reviewer",
                             command=lambda: self.show_page(graph_page),
                             bg="#4CAF50", fg="white",

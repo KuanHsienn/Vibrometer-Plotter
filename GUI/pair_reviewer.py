@@ -32,7 +32,8 @@ class PairReviewer(tk.Frame):
         self.chk = []
         for col in range(2):
             cb = tk.Checkbutton(self.content_frame, variable=self.chk_var[col],
-                                bg="white", command=lambda i=col: self._toggle(i))
+                                bg="white", font=("Helvetica", 12),    
+                                padx=10, pady=5, command=lambda i=col: self._toggle(i))
             cb.grid(row=0, column=col, pady=(0,10), sticky="nsew")
             self.chk.append(cb)
 
@@ -52,6 +53,8 @@ class PairReviewer(tk.Frame):
         self.btn_prev.grid(row=0, column=0, sticky="w", padx=10)
 
         self.btn_submit = tk.Button(nav, text="Submit Average", bg="#4CAF50", fg="white",
+                                    font=("Helvetica", 14, "bold"), 
+                                    padx=20, pady=10,       
                                     command=self._submit)
         self.btn_submit.grid(row=0, column=1)
 
@@ -126,15 +129,20 @@ class PairReviewer(tk.Frame):
     def prev(self):
         if self.page >= 2:
             self.page -= 2
-            self._draw()
+        else:
+            self.page = (len(self.items) - 1) // 2 * 2
+        self._draw()
 
     def next(self):
         if self.page + 2 < len(self.items):
             self.page += 2
-            self._draw()
+        else:
+            self.page = 0
+        self._draw()
 
     def _submit(self):
-        # kept_idx   = [int(it.label.split()[-1]) - 1 for it in kept_items]
-        # all_idx    = list(range(len(measurement.scanpoints)))
-        # anomaly_idx = [i for i in all_idx if i not in kept_idx]
-        self.on_submit([g for g in self.items if g.included])
+        kept_idx   = [int(item.label.split()[-1]) for item in self.items if item.included]
+        all_idx    = list(range(1, len(self.items) + 1))
+        anomaly_idx = [i for i in all_idx if i not in kept_idx]
+
+        self.on_submit([g for g in self.items if g.included], anomaly_idx)

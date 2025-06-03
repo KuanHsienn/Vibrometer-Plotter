@@ -1430,7 +1430,7 @@ class Measurement_Plane:
     
     
 
-    def get_average(self, channel_signal_type: str, anomaly_indices=[]):
+    def get_average(self, channel_signal_type: str, anomalous_indices=None):
         """
         Return a single-point graph or a Graph_average of all non-anomalous points
         for the requested channel (raw or *_db).  If every point is anomalous
@@ -1459,18 +1459,17 @@ class Measurement_Plane:
             # raw
             return getattr(scanpoint, raw_name)
 
-        if anomaly_indices:
-            anomalous = anomaly_indices
+        if anomalous_indices != None:
+            anomalous = anomalous_indices
         else:
             anomalous = set(self.get_anomalous(channel_signal_type))   # point numbers
         if len(anomalous) == self.number_of_scan_points:
             print(f"Error: All scan-points in {self.scan_name[:-4]} are anomalous.")
-            return False
+            
 
         if self.number_of_scan_points == 1:
             if 1 in anomalous:
                 print(f"Error: The only scan-point is anomalous in {self.scan_name[:-4]}")
-                return False
             return _get_graph(self.scanpoints[0], channel_signal_type)
 
         graphs_to_avg = [
