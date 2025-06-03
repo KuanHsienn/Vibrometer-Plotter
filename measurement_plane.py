@@ -50,7 +50,7 @@ class Measurement_Plane:
         first_data_index = (np.where(self.set_types == 58))[0][0]
         graph_indices = np.where(self.set_types == 58)[0]
         actual_graph_count = len(graph_indices)
-        print(f"graph count: {actual_graph_count}")
+        #print(f"graph count: {actual_graph_count}")
         
         self.number_of_scan_points = int(actual_graph_count/number_graphs)
 

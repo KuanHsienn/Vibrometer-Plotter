@@ -104,13 +104,14 @@ class VibroGUI(Tk):
         back_frame = tk.Frame(container, bg="white")
         back_frame.pack(fill=tk.X, padx=10, pady=10)
 
-        def back_callback():
+        def back():
             for figure in self.current_figs:
                 plt.close(figure)
             self.current_figs = []
-            self.single_measurement(False)
+            if back_callback:
+                back_callback()
 
-        tk.Button(back_frame, text="Back to Measurement Options", command=back_callback,
+        tk.Button(back_frame, text="Back to Measurement Options", command=back,
                 bg="#4CAF50", fg="white", font=("Times New Roman", 11, "bold")).pack(side=tk.LEFT)
 
         if export_callback is not None:
@@ -259,7 +260,7 @@ class VibroGUI(Tk):
                             font=("Times New Roman", 11, "bold")).pack(pady=10)
 
                     self.add_nav_buttons(avg_page, export_callback=export_average,
-                                    back_callback=lambda: self.show_page(graph_page))
+                                    back_callback=lambda: self.single_measurement(False))
 
                     self.show_page(avg_page)
 
@@ -267,7 +268,7 @@ class VibroGUI(Tk):
                 viewer.pack(fill="both", expand=True)
 
                 # Add back/export buttons to main graph_page (reviewer)
-                self.add_nav_buttons(graph_page)
+                self.add_nav_buttons(graph_page, back_callback=lambda: self.single_measurement(False))
 
             else:
                 # Single scan-point graph
@@ -303,7 +304,7 @@ class VibroGUI(Tk):
                     exported_name = graph_obj.gui_export()
 
                 # Add back/export buttons to graph_page
-                self.add_nav_buttons(graph_page, export_callback=export_single)
+                self.add_nav_buttons(graph_page, export_callback=export_single, back_callback=lambda: self.single_measurement(False))
 
             self.show_page(graph_page)
 
@@ -348,7 +349,7 @@ class VibroGUI(Tk):
         if not files:
             return
         device = Device(files)
-        device.export()
+        device.export(isGUI=True)
         messagebox.showinfo("Exported", "Device measurements exported.")
 
 app = VibroGUI()
