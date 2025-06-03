@@ -48,7 +48,12 @@ class Measurement_Plane:
         #search in set_types array for 58 and get tuple of indexes for search result
         #get the index of the first instance of 58 and save as first data index which is where the first data graph is stored in self.data
         first_data_index = (np.where(self.set_types == 58))[0][0]
+        graph_indices = np.where(self.set_types == 58)[0]
+        actual_graph_count = len(graph_indices)
+        print(f"graph count: {actual_graph_count}")
         
+        self.number_of_scan_points = int(actual_graph_count/number_graphs)
+
         #dictionary holding all the scan point objects
         self.scanpoints = []
 
@@ -68,15 +73,15 @@ class Measurement_Plane:
         last_scan_point = self.data[-1]
 
         #get number of last scan point which is also total number of scan points
-        self.number_of_scan_points = last_scan_point["rsp_node"]
+        # self.number_of_scan_points = last_scan_point["rsp_node"]
 
         #save total number of graphs as an attribute
-        self.total_graphs = self.number_of_scan_points * self.number_graphs
+        #self.total_graphs = self.number_of_scan_points * self.number_graphs
 
         #iterate through all the graphs in the measurement and update their filename attribute to the current filename
         #start from the index of the first graph data and end at index of last graph data
-        for i in range(first_data_index, self.total_graphs + first_data_index):
-
+        #print(f"{actual_graph_count} {first_data_index} {len(self.data)}")
+        for i in graph_indices:
             #set filename attribute to current filename
             self.data[i]["id4"] = str(os.path.basename(filepath))
 
@@ -96,7 +101,10 @@ class Measurement_Plane:
 
             #iterate through all the graphs for the current scan point
             for graph in range(self.number_graphs):
-                
+                if index >= len(self.data):
+                    print(f"⚠️ Warning: Not enough graph data for scan point {point + 1}. Expected {self.number_graphs} graphs, found fewer.")
+                    break
+
                 #access one graph for the current scan point
                 scan_point_graph = self.data[index]
 
@@ -106,38 +114,40 @@ class Measurement_Plane:
                 #increment the index by the number of scan points
                 #to access the next graph for this same scan point
                 index += self.number_of_scan_points
-                
+            
+            if len(scan_point_all_graphs) != self.number_graphs:
+                continue
 
             #create instance of scan point object for this scan point 
             #and append this scan point object to list of scan points for this measurement
             self.scanpoints.append(Scan_Point(scan_point_all_graphs))
 
 
-            #attribute to store anomalous points when get_anomalous method is called
-            self.anomalous_points = []
+        #attribute to store anomalous points when get_anomalous method is called
+        self.anomalous_points = []
 
-            #attribute to store a 2D list for non-anomalous points when get_anomalous method is called
-            #before get_anomalous method is called, it is assumed all points are non-anomalous
-            self.scan_point_coordinates_valid = self.scan_point_coordinates
+        #attribute to store a 2D list for non-anomalous points when get_anomalous method is called
+        #before get_anomalous method is called, it is assumed all points are non-anomalous
+        self.scan_point_coordinates_valid = self.scan_point_coordinates
 
-            #attribute to store a 2D list for anomalous points when get_anomalous method is called
-            self.scan_point_coordinates_anomalous = [[], [], [], []]
+        #attribute to store a 2D list for anomalous points when get_anomalous method is called
+        self.scan_point_coordinates_anomalous = [[], [], [], []]
 
-            #attribute to store list of all bands after calling create_bands method
-            #each band is a list of point numbers
-            self.all_bands = []
+        #attribute to store list of all bands after calling create_bands method
+        #each band is a list of point numbers
+        self.all_bands = []
 
-            #attribute to store list of all bands after calling create_bands method
-            #each band is a list of scan point objects
-            self.all_bands_points = []
+        #attribute to store list of all bands after calling create_bands method
+        #each band is a list of scan point objects
+        self.all_bands_points = []
 
-            #attribute to store list of graph average objects of each band after calling get_band_averages method
-            self.band_averages = []
+        #attribute to store list of graph average objects of each band after calling get_band_averages method
+        self.band_averages = []
 
-            ##attribute to store a list of remarks, one for for each band
-            #indicate color of band as shown on scan layout, as well as the scanpoints included in the band
-            #after calling get_band_averages method
-            self.band_remarks = []
+        ##attribute to store a list of remarks, one for for each band
+        #indicate color of band as shown on scan layout, as well as the scanpoints included in the band
+        #after calling get_band_averages method
+        self.band_remarks = []
 
             
 
