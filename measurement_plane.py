@@ -42,7 +42,38 @@ class Measurement_Plane:
         self.scan_point_coordinates = [self.scan_point_names, self.data[self.coordinates_data_index]["x"], self.data[self.coordinates_data_index]["y"], self.data[self.coordinates_data_index]["z"]]
 
         #attribute to store list of colours for bands of points
-        self.band_colours = ["blue", "orange", "green", "red", "purple", "brown", "pink", "olive", "cyan", "magenta"]
+        self.band_colours = self.band_colours = [
+                            "#1f77b4",  # blue
+                            "#ff7f0e",  # orange
+                            "#2ca02c",  # green
+                            "#d62728",  # red
+                            "#9467bd",  # purple
+                            "#8c564b",  # brown
+                            "#e377c2",  # pink
+                            "#7f7f7f",  # gray
+                            "#bcbd22",  # olive
+                            "#17becf",  # cyan
+                            "#393b79",  # dark blue
+                            "#637939",  # dark olive
+                            "#8c6d31",  # dark gold
+                            "#843c39",  # dark red
+                            "#7b4173",  # dark purple
+                            "#aec7e8",  # light blue
+                            "#ffbb78",  # light orange
+                            "#98df8a",  # light green
+                            "#ff9896",  # light red
+                            "#c5b0d5",  # light purple
+                            "#c49c94",  # light brown
+                            "#f7b6d2",  # light pink
+                            "#c7c7c7",  # light gray
+                            "#dbdb8d",  # light olive
+                            "#9edae5",  # light cyan
+                            "#393b79",  # navy
+                            "#5254a3",  # medium blue
+                            "#6b6ecf",  # bluish purple
+                            "#9c9ede",  # light bluish purple
+                            "#cedb9c",  # pale green
+                        ]
         
         
         #search in set_types array for 58 and get tuple of indexes for search result
