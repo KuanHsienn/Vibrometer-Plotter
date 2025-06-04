@@ -317,31 +317,58 @@ class VibroGUI(Tk):
         self.show_page(page)
 
     def compare_measurements(self):
-        files = filedialog.askopenfilenames(title="Select multiple .uff files for comparison")
-        if not files:
+        self.selected_files = filedialog.askopenfilenames(
+                title="Select a *.uff measurement file",
+                filetypes=[("UFF files", "*.uff"), ("All files", "*.*")]
+            )
+        if not self.selected_files:
             return
 
-        compare_win = tk.Toplevel(self)
-        compare_win.title("Compare Surface Averages")
+        try:
+            comparison_obj = Compare_Surface_Average(self.selected_files)
+        except Exception as e:
+            messagebox.showerror("Load Error", str(e))
+            return
+        
+        # ---- Menu Box For Selection ----
+        # Create a new page frame
+        page = tk.Frame(self.container, bg="white")
+        self.page_frame = page
+        self.add_home_button(page)
 
-        tk.Label(compare_win, text="Choose Graph Type").pack()
-        graph_combo = ttk.Combobox(compare_win, values=graph_types, state="readonly")
-        graph_combo.pack()
+        content = tk.Frame(page, bg="#f0f0f0", bd="10", relief="groove", padx=40, pady=30)
+        content.place(relx=0.5, rely=0.5, anchor="center")
 
-        tk.Label(compare_win, text="Choose Output Type").pack()
-        unit_combo = ttk.Combobox(compare_win, values=["1: Display", "2: Export"], state="readonly")
-        unit_combo.pack()
+        # Title
+        tk.Label(content, text="Measurement Options", font=("Times New Roman", 16, "bold"), relief="groove", bg="#f0f0f0").pack(pady=(0, 12))
 
+        # Task
+        unit_var = tk.StringVar(value="raw")
+        graph_var = tk.StringVar(value=graph_types[0])
+
+        # Units
+        tk.Label(content, text="Units:", font=("Times New Roman", 11, "bold"), bg="#f0f0f0").pack(anchor="w", pady=(8, 0))
+        for t, v in (("Raw", "raw"), ("Decibel", "db")):
+            ttk.Radiobutton(content, text=t, variable=unit_var, value=v).pack(anchor="w")
+
+        # Graph type combobox
+        graph_type_label = tk.Label(content, text="Graph type:", font=("Times New Roman", 11, "bold"), bg="#f0f0f0")
+        graph_type_label.pack(anchor="w", pady=(8, 0))
+        ttk.Combobox(content, state="readonly", values=graph_types, textvariable=graph_var, width=35).pack()
+
+        graph_id = short_graph_types[graph_types.index(graph_var.get())]
+        channel_signal_type = graph_id if unit_var == "raw" else f"{graph_id}_db"
+        
         def compare_action():
-            idx = graph_combo.current()
-            unit = unit_combo.get()
-            graph_id = short_graph_types[idx]
-            if unit == "1":
-                Compare_Surface_Average(files, graph_id).compare_surface_average_plot()
-            else:
-                Compare_Surface_Average(files, f"{graph_id}_db").compare_surface_average_export()
+            pass
 
-        tk.Button(compare_win, text="Compare", command=compare_action).pack(pady=10)
+        # Run button
+        tk.Button(content, text="Run", bg="#4CAF50", fg="white",
+                font=("Times New Roman", 11, "bold"),
+                command=compare_action).pack(side="bottom", pady=(12, 4))
+
+        # Show the page
+        self.show_page(page)
 
     def export_device(self, is_new_instance=True):
         if is_new_instance:

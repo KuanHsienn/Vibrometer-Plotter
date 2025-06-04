@@ -11,11 +11,19 @@ from hxml_writer import HXMLGenerator
 
 class Compare_Surface_Average:
 
-    def __init__(self, list_filenames, channel_signal_type):
-
+    def __init__(self, list_filenames):
+        self.list_filenames = list_filenames
+        
         #create a list of Measurement_Plane objects, one object for each scan file
         self.measurement_list = [Measurement_Plane(f"{filename}") for filename in list_filenames]
+        self.average_list = []
+        self.remarks_list = []
+        self.graph_names = []
+        self.short_names = []
+        self.short_chan_sig = None
 
+        
+    def initialize_from_files(self, channel_signal_type):
         #create a list of Graph_average objects, one for each surface average
         self.average_list = [measurement.get_average(channel_signal_type) for measurement in self.measurement_list]
 
@@ -29,10 +37,13 @@ class Compare_Surface_Average:
         self.short_names = get_short_names(self.graph_names)
 
         #get shortened channel signal name
-        self.short_chan_sig = get_short_chan_signal(self.average_list[0].channel_signal)
+        self.short_chan_sig = self.extract_short_channel_signal()
 
-
-
+    def extract_short_channel_signal(self):
+        if not self.average_list:
+            return None  # or raise ValueError("No averages to extract channel signal from.")
+        return get_short_chan_signal(self.average_list[0].channel_signal)
+    
     def compare_surface_average_export(self):
 
         '''Method to export surface averages of the required channel signal and unit
