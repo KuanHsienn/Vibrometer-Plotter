@@ -37,6 +37,10 @@ class PairReviewer(tk.Frame):
             cb.grid(row=0, column=col, pady=(0,10), sticky="nsew")
             self.chk.append(cb)
 
+        # Page number label at top-right corner
+        self.page_label = tk.Label(self, text="", bg="white", font=("Helvetica", 12))
+        self.page_label.place(relx=1.0, rely=0, anchor="ne", x=-10, y=10)
+
         # Graph canvases placeholder, grid row 1
         self.canvas = [None, None]
 
@@ -125,6 +129,10 @@ class PairReviewer(tk.Frame):
         # Let row 0 (graphs) expand vertically
         self.content_frame.grid_rowconfigure(0, weight=1)
 
+        # Page numbers
+        total_pages = (len(self.items) + 1) // 2
+        current_page = self.page // 2 + 1
+        self.page_label.config(text=f"Page {current_page} / {total_pages}")
 
     def prev(self):
         if self.page >= 2:
