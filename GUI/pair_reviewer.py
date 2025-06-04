@@ -52,7 +52,7 @@ class PairReviewer(tk.Frame):
                                   bd=0, relief="flat", highlightthickness=0, bg="white")
         self.btn_prev.grid(row=0, column=0, sticky="w", padx=10)
 
-        self.btn_submit = tk.Button(nav, text="Submit Average", bg="#4CAF50", fg="white",
+        self.btn_submit = tk.Button(nav, text="Submit Points", bg="#4CAF50", fg="white",
                                     font=("Helvetica", 14, "bold"), 
                                     padx=20, pady=10,       
                                     command=self._submit)
@@ -141,8 +141,8 @@ class PairReviewer(tk.Frame):
         self._draw()
 
     def _submit(self):
-        kept_idx   = [int(item.label.split()[-1]) for item in self.items if item.included]
-        all_idx    = list(range(1, len(self.items) + 1))
+        kept_idx = [i + 1 for i, item in enumerate(self.items) if item.included]
+        all_idx = list(range(1, len(self.items) + 1))
         anomaly_idx = [i for i in all_idx if i not in kept_idx]
 
         self.on_submit([g for g in self.items if g.included], anomaly_idx)

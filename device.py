@@ -30,6 +30,11 @@ class Device:
         #attribute to store list of surface types included in this device not in a particular order
         self.surface_types = []
 
+        #initialise empty list for graphs
+        self.graph_list = []
+
+        #intialise empty list for remarks
+        self.remarks_list = []
 
         #iterate through all the measurement planes
         #filters them and saves them as the respective attribute
@@ -251,9 +256,27 @@ class Device:
         #return device ref3 average graph object
         return ref3_device_average
 
+    def calc_ref1_and_ref3(self):
+        #create ref1 device average
+        ref1_average = self.get_ref1_average()
+
+        #append ref1 device average to graphs list
+        self.graph_list.append(ref1_average)
+
+        #append remarks for ref1 device average to remarks list
+        self.remarks_list.append(ref1_average.remarks)
 
 
-    def export(self):
+        #create ref3 device average
+        ref3_average = self.get_ref3_average()
+
+        #append ref3 device average to graphs list
+        self.graph_list.append(ref3_average)
+
+        #append remarks for ref3 device average to remarks list
+        self.remarks_list.append(ref3_average.remarks)
+
+    def export(self, is_GUI=False):
 
         '''
         Export into one HXML file with structure (each with anomalous points remarks):
@@ -286,74 +309,49 @@ class Device:
         23. VibRef3 (dB) surface average ear hook right
         '''
 
-        #initialise empty list for graphs
-        graphs_list = []
+        if not is_GUI:
+            self.calc_ref1_and_ref3()
 
-        #intialise empty list for remarks
-        remarks_list = []
+            #create and add all the Vib Vel (dB) surface averages to graphs list and their respective remarks to remarks list
+            #iterate through all the surfaces provided
+            for surface in self.all_surfaces:
+                
+                #create vib (dB) surface average for the surface
+                surface_vib_average = surface.get_average("vib_db")
 
+                #append vib (dB) surface average to graphs list
+                self.graph_list.append(surface_vib_average)
 
-
-        #create ref1 device average
-        ref1_average = self.get_ref1_average()
-
-        #append ref1 device average to graphs list
-        graphs_list.append(ref1_average)
-
-        #append remarks for ref1 device average to remarks list
-        remarks_list.append(ref1_average.remarks)
-
-
-        #create ref3 device average
-        ref3_average = self.get_ref3_average()
-
-        #append ref3 device average to graphs list
-        graphs_list.append(ref3_average)
-
-        #append remarks for ref3 device average to remarks list
-        remarks_list.append(ref3_average.remarks)
+                #append remarks for vib (dB) surface average to remarks list
+                self.remarks_list.append(surface_vib_average.remarks)
 
 
-        #create and add all the Vib Vel (dB) surface averages to graphs list and their respective remarks to remarks list
-        #iterate through all the surfaces provided
-        for surface in self.all_surfaces:
-            
-            #create vib (dB) surface average for the surface
-            surface_vib_average = surface.get_average("vib_db")
+            #create and add all the VibRef1 (dB) surface averages to graphs list and their respective remarks to remarks list
+            #iterate through all the surfaces provided
+            for surface in self.all_surfaces:
+                
+                #create vibref1 (dB) surface average for the surface
+                surface_vibref1_average = surface.get_average("vibref1_db")
 
-            #append vib (dB) surface average to graphs list
-            graphs_list.append(surface_vib_average)
+                #append vibref1 (dB) surface average to graphs list
+                self.graph_list.append(surface_vibref1_average)
 
-            #append remarks for vib (dB) surface average to remarks list
-            remarks_list.append(surface_vib_average.remarks)
-
-
-        #create and add all the VibRef1 (dB) surface averages to graphs list and their respective remarks to remarks list
-        #iterate through all the surfaces provided
-        for surface in self.all_surfaces:
-            
-            #create vibref1 (dB) surface average for the surface
-            surface_vibref1_average = surface.get_average("vibref1_db")
-
-            #append vibref1 (dB) surface average to graphs list
-            graphs_list.append(surface_vibref1_average)
-
-            #append remarks for vibref1 (dB) surface average to remarks list
-            remarks_list.append(surface_vibref1_average.remarks)
+                #append remarks for vibref1 (dB) surface average to remarks list
+                self.remarks_list.append(surface_vibref1_average.remarks)
 
 
-        #create and add all the VibRef3 (dB) surface averages to graphs list and their respective remarks to remarks list
-        #iterate through all the surfaces provided
-        for surface in self.all_surfaces:
-            
-            #create vibref3 (dB) surface average for the surface
-            surface_vibref3_average = surface.get_average("vibref3_db")
+            #create and add all the VibRef3 (dB) surface averages to graphs list and their respective remarks to remarks list
+            #iterate through all the surfaces provided
+            for surface in self.all_surfaces:
+                
+                #create vibref3 (dB) surface average for the surface
+                surface_vibref3_average = surface.get_average("vibref3_db")
 
-            #append vibref3 (dB) surface average to graphs list
-            graphs_list.append(surface_vibref3_average)
+                #append vibref3 (dB) surface average to graphs list
+                self.graph_list.append(surface_vibref3_average)
 
-            #append remarks for vibref3 (dB) surface average to remarks list
-            remarks_list.append(surface_vibref3_average.remarks)
+                #append remarks for vibref3 (dB) surface average to remarks list
+                self.remarks_list.append(surface_vibref3_average.remarks)
 
 
         #use this to get the message box and file dialog to show as top windows later
@@ -391,7 +389,7 @@ class Device:
         hxml_object = HXMLGenerator(user_filename)
 
         #write the current graph object's data to the HXML file
-        hxml_object.graphs_to_hxml(graphs_list, remarks_list)
+        hxml_object.graphs_to_hxml(self.graph_list, self.remarks_list)
 
 
 

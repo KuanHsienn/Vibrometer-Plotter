@@ -209,7 +209,7 @@ class VibroGUI(Tk):
                 key_db = f"{graph_id}_db"
                 key = key_raw if units == "raw" else key_db
 
-                for i, sp in enumerate(measurement.scanpoints, start=1):
+                for sp in measurement.scanpoints:
                     try:
                         if units == "raw":
                             g_obj = getattr(sp, key_raw)
@@ -220,17 +220,16 @@ class VibroGUI(Tk):
                     if g_obj is None:
                         continue
                     fig = graph_plotter(g_obj)
-                    graph_items.append(GraphItem(fig, f"Point {i}"))
+                    graph_items.append(GraphItem(fig, f"Point {sp.scan_point_no}"))
                     self.current_figs.append(fig)
 
                 def build_final_average(kept_items, anomalous_indices):
+                    print(anomalous_indices)
                     if not kept_items:
                         messagebox.showwarning("No points selected", "You excluded every scan point.")
                         return
 
-
                     try:
-                        # Step 3: Call CLI-style averaging method
                         avg_graph = measurement.get_average(key, anomalous_indices=anomalous_indices)
                     except Exception as e:
                         messagebox.showerror("Averaging Failed", f"An error occurred while averaging:\n{str(e)}")
@@ -239,7 +238,7 @@ class VibroGUI(Tk):
                     avg_fig = graph_plotter(avg_graph)
                     self.current_figs.append(avg_fig)
 
-                    # Step 4: Create new page to show the average
+                    # Create new page to show the average
                     avg_page = tk.Frame(self.container, bg="white")
                     avg_frame = tk.Frame(avg_page, bg="white")
                     avg_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
@@ -344,13 +343,95 @@ class VibroGUI(Tk):
 
         tk.Button(compare_win, text="Compare", command=compare_action).pack(pady=10)
 
-    def export_device(self):
-        files = filedialog.askopenfilenames(title="Select .uff files of one device")
-        if not files:
+    def export_device(self, is_new_instance=True):
+        if is_new_instance:
+            window = Tk()
+            window.withdraw()
+
+            # ---- UFF file verification ----
+            messagebox.showinfo("Choose Scan Data Measurement Files", "Please hold down CTRL key and select the measurement files with extension .uff of all the scan surfaces from the same device", parent=window)
+
+            self.selected_files = filedialog.askopenfilenames(
+                title="Select a *.uff measurement file",
+                filetypes=[("UFF files", "*.uff"), ("All files", "*.*")]
+            )
+
+            if not self.selected_files:
+                return
+            for file_path in self.selected_files:
+                if not file_path.lower().endswith(".uff"):
+                    messagebox.showerror("Invalid File", f"File {file_path} is not a .uff file.")
+                    return
+
+        try:
+            device = Device(self.selected_files)
+        except Exception as e:
+            messagebox.showerror("Load Error", str(e))
             return
-        device = Device(files)
-        device.export(isGUI=True)
-        messagebox.showinfo("Exported", "Device measurements exported.")
+
+        # Run
+        graph_page = tk.Frame(self.container, bg="white")
+        graph_frame = tk.Frame(graph_page)
+        graph_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+
+        graph_items = []
+        graph_metadata = [None]
+
+        device.calc_ref1_and_ref3()
+        keys = ["vib", "vibref1", "vibref3"]
+
+        for surface_idx, surface in enumerate(device.all_surfaces):
+            for key_raw in keys:
+                key = f"{key_raw}_db"
+                for sp in surface.scanpoints:
+                    try:
+                        g_obj = getattr(sp, f"create_{key_raw}_decibel")()
+                        if g_obj is None:
+                            continue
+                        fig = graph_plotter(g_obj)
+                        graph_items.append(GraphItem(fig, f"{key.upper()} - Surface {surface_idx}, Point {sp.scan_point_no}"))
+                        graph_metadata.append((surface_idx, key, sp.scan_point_no))
+                        self.current_figs.append(fig)
+                    except Exception as e:
+                        print(f"Failed to get graph for {key} at surface {surface_idx} point {sp.scan_point_no}: {e}")
+
+        def build_final_average(kept_items, excluded_indices):
+            if not kept_items:
+                messagebox.showwarning("No points selected", "You excluded every graph.")
+                return
+            # Build anomalous_indices from excluded graph indices
+            anomalous_indices = {}  # {surface_idx: {key: [scan_point_indices]}}
+            for idx in excluded_indices:
+                try:
+                    surface_idx, key, scan_point_no = graph_metadata[idx]
+                    if surface_idx not in anomalous_indices:
+                        anomalous_indices[surface_idx] = {}
+                    if key not in anomalous_indices[surface_idx]:
+                        anomalous_indices[surface_idx][key] = []
+                    anomalous_indices[surface_idx][key].append(scan_point_no)
+                except IndexError:
+                    continue  # Skip if index is invalid
+
+            # For each key, average surface excluding anomalous indices
+            keys_db = ["vib_db", "vibref1_db", "vibref3_db"]
+            for key in keys_db:
+                for surface_idx, surface in enumerate(device.all_surfaces):
+                    excluded = anomalous_indices.get(surface_idx, {}).get(key, [])
+                    avg_graph = surface.get_average(key, anomalous_indices=excluded)
+                    device.graph_list.append(avg_graph)
+                    device.remarks_list.append(avg_graph.remarks)
+
+            # You could then export or visualize this
+            device.export(is_GUI=True)
+
+        viewer = PairReviewer(graph_frame, graph_items, build_final_average)
+        viewer.pack(fill="both", expand=True)
+
+        # Add back/export buttons to main graph_page (reviewer)
+        self.add_nav_buttons(graph_page, back_callback=lambda: self.show_page(self.menu_frame))
+        self.show_page(graph_page)
+
+
 
 app = VibroGUI()
 app.mainloop()
