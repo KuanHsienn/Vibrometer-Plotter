@@ -72,8 +72,9 @@ class VibroGUI(Tk):
 
         combobox = ttk.Combobox(content_frame, values=[
             "1: Single Measurement",
-            "2: Compare Measurements",
-            "3: Export all measurements for a device to a HXML file"
+            "2: Surface Average Comparison",
+            "3: Band Average Comparison",
+            "4: Export all measurements for a device to a HXML file"
         ], state="readonly", textvariable=self.task_type, font=("Times New Roman", 12), width=50)
         combobox.pack(pady=(0, 20))
 
@@ -93,8 +94,10 @@ class VibroGUI(Tk):
             case "1":
                 self.single_measurement()
             case "2":
-                self.compare_measurements()
+                self.surface_average_comparison()
             case "3":
+                self.band_average_comparison()
+            case "4":
                 self.export_device()
             case _:
                 messagebox.showerror("Invalid", "Unknown task type.")
@@ -315,7 +318,7 @@ class VibroGUI(Tk):
         # Show the page
         self.show_page(page)
 
-    def compare_measurements(self, is_new_instance=True):
+    def surface_average_comparison(self, is_new_instance=True):
         if is_new_instance:
             window = Tk()
             window.withdraw()
@@ -449,7 +452,7 @@ class VibroGUI(Tk):
 
                 self.add_nav_buttons(avg_page,
                                     export_callback=export_average,
-                                    back_callback=lambda: self.compare_measurements(False))
+                                    back_callback=lambda: self.surface_average_comparison(False))
 
                 self.show_page(avg_page)
 
@@ -457,9 +460,145 @@ class VibroGUI(Tk):
             viewer.pack(fill="both", expand=True)
 
             # Add back/export buttons to main graph_page (reviewer)
-            self.add_nav_buttons(graph_page, back_callback=lambda: self.compare_measurements(False))
+            self.add_nav_buttons(graph_page, back_callback=lambda: self.surface_average_comparison(False))
             self.show_page(graph_page)
 
+        # Run button
+        tk.Button(content, text="Run", bg="#4CAF50", fg="white",
+                font=("Times New Roman", 11, "bold"),
+                command=run).pack(side="bottom", pady=(12, 4))
+
+        # Show the page
+        self.show_page(page)
+
+    def band_average_comparison(self, is_new_instance=True):
+        if is_new_instance:
+            window = Tk()
+            window.withdraw()
+
+            # ---- UFF file verification ----
+            messagebox.showinfo("Choose Scan Data Measurement File", "Please select the measurement file with extension .uff", parent=window)
+
+            self.single_file_path = filedialog.askopenfilename(
+                title="Select a *.uff measurement file",
+                filetypes=[("UFF files", "*.uff"), ("All files", "*.*")]
+            )
+            if not self.single_file_path:
+                return
+            if not self.single_file_path.lower().endswith(".uff"):
+                messagebox.showerror("Invalid File", "Selected file is not a .uff file.")
+                return
+        
+        try:
+            measurement = Measurement_Plane(self.single_file_path)
+        except Exception as e:
+            messagebox.showerror("Load Error", str(e))
+            return
+
+        # ---- Menu Box For Selection ----
+        # Create a new page frame
+        page = tk.Frame(self.container, bg="white")
+        self.page_frame = page
+        self.add_home_button(page)
+
+        content = tk.Frame(page, bg="#f0f0f0", bd="10", relief="groove", padx=40, pady=30)
+        content.place(relx=0.5, rely=0.5, anchor="center")
+
+        # Title
+        tk.Label(content, text="Measurement Options", font=("Times New Roman", 16, "bold"), relief="groove", bg="#f0f0f0").pack(pady=(0, 12))
+
+        # Task
+        unit_var = tk.StringVar(value="raw")
+        graph_var = tk.StringVar(value=graph_types[0])
+
+        # Units
+        tk.Label(content, text="Units:", font=("Times New Roman", 11, "bold"), bg="#f0f0f0").pack(anchor="w", pady=(8, 0))
+        for t, v in (("Raw", "raw"), ("Decibel", "db")):
+            ttk.Radiobutton(content, text=t, variable=unit_var, value=v).pack(anchor="w")
+
+        # Graph type combobox
+        graph_type_label = tk.Label(content, text="Graph type:", font=("Times New Roman", 11, "bold"), bg="#f0f0f0")
+        graph_type_label.pack(anchor="w", pady=(8, 0))
+        ttk.Combobox(content, state="readonly", values=graph_types, textvariable=graph_var, width=35).pack()
+
+        def run():
+            units = unit_var.get()                # "raw" | "db"
+            graph_id = short_graph_types[graph_types.index(graph_var.get())]
+
+            key = graph_id if units == "raw" else f"{graph_id}_db"
+
+            # Create a new frame for the graph page
+            graph_page = tk.Frame(self.container, bg="white")
+            graph_frame = tk.Frame(graph_page)
+            graph_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+
+            graph_items = []
+
+            for sp in measurement.scanpoints:
+                try:
+                    if units == "raw":
+                        g_obj = getattr(sp, graph_id)
+                    else:
+                        g_obj = getattr(sp, f"create_{graph_id}_decibel")()
+                except AttributeError:
+                    g_obj = getattr(sp, key) if hasattr(sp, key) else None
+                if g_obj is None:
+                    continue
+                fig = graph_plotter(g_obj)
+                graph_items.append(GraphItem(fig, f"Point {sp.scan_point_no}"))
+                self.current_figs.append(fig)
+            
+            def build_final_graph(kept_items, excluded_indices):
+                avg_page = tk.Frame(self.container, bg="white")
+                avg_frame = tk.Frame(avg_page, bg="white")
+                avg_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+
+                measurement.set_anomalous_points(excluded_indices)
+
+                def prepare_for_export():
+                    export_page = tk.Frame(self.container, bg="white")
+                    export_frame = tk.Frame(export_page, bg="white")
+                    export_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+
+                    measurement.bands_layout()
+                    measurement.plot_band_averages(key)
+                    combined_fig, ax = measurement.get_band_averages_plot(key)
+                    self.current_figs.append(combined_fig)
+
+                    tk.Label(export_frame, text="All Averages", bg="white",
+                        font=("Times New Roman", 16, "bold")).pack(pady=(12, 6))
+
+                    canvas = FigureCanvasTkAgg(combined_fig, master=export_frame)
+                    canvas.draw()
+                    canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+
+                    tk.Button(export_frame, text="Back to reviewer",
+                            command=lambda: self.show_page(graph_page),
+                            bg="#4CAF50", fg="white",
+                        font=("Times New Roman", 11, "bold")).pack(pady=10)
+                    
+                    def export_final():
+                        measurement.compare_band_averages_plot(key, True)
+
+                    self.add_nav_buttons(export_page,
+                                        export_callback=export_final,
+                                        back_callback=lambda: self.band_average_comparison(False))
+
+                    self.show_page(export_page)
+
+                bands = measurement.create_bands_gui(avg_frame, key, prepare_for_export)
+                
+                # Add back/export buttons to main graph_page (reviewer)
+                self.add_nav_buttons(avg_page, back_callback=lambda: self.band_average_comparison(False))
+                self.show_page(avg_page)
+
+            viewer = PairReviewer(graph_frame, graph_items, build_final_graph)
+            viewer.pack(fill="both", expand=True)
+
+            # Add back/export buttons to main graph_page (reviewer)
+            self.add_nav_buttons(graph_page, back_callback=lambda: self.band_average_comparison(False))
+            self.show_page(graph_page)
+        
         # Run button
         tk.Button(content, text="Run", bg="#4CAF50", fg="white",
                 font=("Times New Roman", 11, "bold"),

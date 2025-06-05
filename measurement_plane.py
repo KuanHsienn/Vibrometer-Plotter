@@ -3,12 +3,14 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as tick
 import numpy as np
 import os
+import tkinter as tk
 from scan_point import Scan_Point
 from scan_point_graph import Graph_average
 from annotated_cursor import AnnotatedCursor
 from tkinter import filedialog, messagebox, Tk
 from data_tools import get_short_names, get_short_chan_signal
 from hxml_writer import HXMLGenerator
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 
 
 #class for one measurement file
@@ -189,7 +191,9 @@ class Measurement_Plane:
         dataset_types = self.uff_file.get_set_types()
         return dataset_types
 
-        
+    def set_anomalous_points(self, anomalous_points):
+        self.anomalous_points = anomalous_points
+
     def display_dataset_types(self):
 
         #iterate through the dataset and print out the dictionary keys
@@ -1526,6 +1530,138 @@ class Measurement_Plane:
 
         # build averaged graph 
         return Graph_average(graphs_to_avg, list(anomalous))
+    
+    def create_bands_gui(self, parent_frame, channel_signal_type, finish_function):
+        '''GUI method to allow user to group scan points into bands via clicks'''
+
+        # Clear parent frame
+        for widget in parent_frame.winfo_children():
+            widget.destroy()
+
+        # Layout: horizontal split
+        plot_frame = tk.Frame(parent_frame)
+        plot_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        control_frame = tk.Frame(parent_frame)
+        control_frame.pack(side=tk.RIGHT, fill=tk.Y)
+
+        # Attributes
+        all_bands = []
+        points_assigned = []
+        selected_band_points = []
+        band_no = 1
+
+        # Create matplotlib figure inside plot_frame
+        fig, ax = plt.subplots(figsize=(7, 6))
+        canvas = FigureCanvasTkAgg(fig, master=plot_frame)
+        canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+
+        # Get coordinates
+        x_coords = self.scan_point_coordinates[1]
+        y_coords = self.scan_point_coordinates[2]
+        point_numbers = self.scan_point_coordinates[0]
+
+        # Draw points
+        point_artists = []
+        for idx, point in enumerate(point_numbers):
+            if point in self.anomalous_points:
+                artist = ax.scatter(x_coords[idx], y_coords[idx], marker='x', c='red')
+            else:
+                artist = ax.scatter(x_coords[idx], y_coords[idx], marker='o', c='grey')
+            ax.annotate(str(point), (x_coords[idx], y_coords[idx] + 0.3))
+            point_artists.append(artist)
+
+        ax.set_title(f"Define Band {band_no}")
+        ax.axis("equal")
+        fig.tight_layout()
+        canvas.draw()
+
+        def find_nearest_point(event):
+            """Find closest scan point to a mouse click"""
+            if event.xdata is None or event.ydata is None:
+                return None
+
+            distances = [(abs(event.xdata - x_coords[i]) ** 2 + abs(event.ydata - y_coords[i]) ** 2, i) 
+                        for i in range(len(x_coords))]
+
+            _, nearest_idx = min(distances)
+            point_number = point_numbers[nearest_idx]
+            return point_number, nearest_idx
+
+        def on_click(event):
+            nonlocal selected_band_points
+
+            result = find_nearest_point(event)
+            if result is None:
+                return
+
+            point_number, idx = result
+
+            if point_number in self.anomalous_points:
+                messagebox.showwarning("Invalid", f"Point {point_number} is anomalous.")
+                return
+
+            if point_number in points_assigned:
+                messagebox.showwarning("Invalid", f"Point {point_number} has already been assigned.")
+                return
+
+            if point_number in selected_band_points:
+                selected_band_points.remove(point_number)
+                point_artists[idx].set_color("grey")
+            else:
+                selected_band_points.append(point_number)
+                band_color = self.band_colours[(band_no - 1) % len(self.band_colours)]
+                point_artists[idx].set_color(band_color)
+
+            canvas.draw()
+
+        def finalize_band():
+            nonlocal band_no, selected_band_points
+
+            if not selected_band_points:
+                messagebox.showinfo("Empty Band", "Please select at least one point.")
+                return
+
+            all_bands.append(selected_band_points.copy())
+            points_assigned.extend(selected_band_points)
+
+            if len(points_assigned) >= self.number_of_scan_points - len(self.anomalous_points):
+                # Done: Save and exit
+                save_and_return()
+                return
+
+            selected_band_points = []
+            band_no += 1
+            ax.set_title(f"Define Band {band_no}")
+            canvas.draw()
+
+        def save_and_return():
+            # Convert to scan point objects
+            all_bands_points = []
+            for band in all_bands:
+                band_points = [self.scanpoints[p - 1] for p in band]
+                all_bands_points.append(band_points)
+
+            self.all_bands = all_bands
+            self.all_bands_points = all_bands_points
+
+            messagebox.showinfo("Banding Complete", f"{len(all_bands)} bands saved.")
+
+            finish_function()
+
+        # Bind click
+        canvas.mpl_connect('button_press_event', on_click)
+
+        # Control panel widgets (on the right)
+        center_frame = tk.Frame(control_frame)
+        center_frame.pack(expand=True, anchor="center")
+
+        tk.Label(center_frame, text="Click points to add/remove\nfrom current band.").pack(pady=10)
+        tk.Button(center_frame, text="Next Band", bg="#4CAF50", fg="white",
+                font=("Times New Roman", 11, "bold"), command=finalize_band).pack(pady=10)
+
+        return all_bands
+
 
     def create_bands(self, channel_signal_type):
 
@@ -1722,7 +1858,7 @@ class Measurement_Plane:
         #return all_bands
         return all_bands
 
-    def bands_layout(self):
+    def bands_layout(self, is_GUI=False):
 
         '''Method to display scatter plot of scan points with each band differentiated by colour'''
 
@@ -1777,8 +1913,9 @@ class Measurement_Plane:
         #update legend for the plot to show band numbers
         plt.legend(loc = "best")
 
-        #show plot but allow program to continue executing even when figure is open
-        plt.show(block = False)
+        if not is_GUI:
+            #show plot but allow program to continue executing even when figure is open
+            plt.show(block = False)
             
         #use this to get the message box and file dialog to show as top windows later
         window = Tk()
@@ -1816,20 +1953,9 @@ class Measurement_Plane:
         #save as the plot as a png image
         plt.savefig(user_photo_filename, dpi=300, bbox_inches="tight")
 
+    def plot_band_averages(self, channel_signal_type):
 
-
-    def get_band_averages(self, channel_signal_type):
-        
         '''Method to create average graph objects for each band, and store in a list and return the list.'''
-
-        #define anomalous points 
-        self.get_anomalous(channel_signal_type)
-
-        #get user to define bands
-        self.create_bands(channel_signal_type)
-
-        #display and save all defined bands
-        self.bands_layout()
 
         #list to store bands, each band as a list of their points with the required channel signal
         all_bands_channel_signal = []
@@ -1953,14 +2079,27 @@ class Measurement_Plane:
         #return band_averages
         return band_averages
 
+    def get_band_averages(self, channel_signal_type, is_GUI=False):
+        
+        '''Initialise anomalous points and return list of band averages graph'''
+        if not is_GUI:
+            #define anomalous points 
+            self.get_anomalous(channel_signal_type)
 
+            #get user to define bands
+            self.create_bands(channel_signal_type)
 
-    def compare_band_averages_export(self, channel_signal_type):
+        #display and save all defined bands
+        self.bands_layout()
+
+        self.plot_band_averages(channel_signal_type)
+
+    def compare_band_averages_export(self, channel_signal_type, is_GUI=False):
 
         '''Method to export band averages.'''
 
         #call band_averages method to update results to self.band_averages attribute
-        self.get_band_averages(channel_signal_type)
+        self.get_band_averages(channel_signal_type, is_GUI)
 
         #create hxml file
         #use this to get the message box and file dialog to show as top windows later
@@ -2008,16 +2147,40 @@ class Measurement_Plane:
 
         #return just file name without folder directory and extension
         return file_name_without_extension
-        
 
+    def get_band_averages_plot(self, channel_signal_type):
+        '''Returns matplotlib figure for band average comparison.'''
 
+        tick_locations = [100, 200, 500, 1000, 2000, 5000, 10000]
+        fig, ax = plt.subplots()
 
+        for index in range(len(self.band_averages)):
+            band = self.band_averages[index]
+            ax.plot(band.x_data, band.y_data,
+                    label=f"{band.scan_name} Average",
+                    color=self.band_colours[index])
 
-    def compare_band_averages_plot(self, channel_signal_type):
+        ax.set_xscale("log", base=2)
+        ax.xaxis.set_major_locator(tick.FixedLocator(tick_locations))
+        ax.xaxis.set_major_formatter(tick.FuncFormatter(lambda x, _: f'{int(x)}'))
+
+        ax.set_xlabel(self.band_averages[0].x_label_with_unit)
+        ax.set_ylabel(self.band_averages[0].y_label_with_unit)
+        ax.set_title(f"{self.band_averages[0].channel_signal} Band Average Comparison")
+        ax.set_xlim([self.band_averages[0].x_min, 10000])
+
+        ax.grid(which="major", color="dimgrey", linewidth=0.5)
+        ax.minorticks_on()
+        ax.grid(which="minor", linestyle=":", color="lightgrey", linewidth=1)
+
+        ax.legend(loc="best")
+        return fig, ax
+
+    def compare_band_averages_plot(self, channel_signal_type, is_GUI=False):
 
         '''Method to export and then plot band averages.'''
 
-        file_name_without_extension = self.compare_band_averages_export(channel_signal_type)
+        file_name_without_extension = self.compare_band_averages_export(channel_signal_type, is_GUI)
 
 
         #use this to get the message box and file dialog to show as top windows later
@@ -2053,46 +2216,10 @@ class Measurement_Plane:
                 #repeat the prompt for user to choose a filename
                 valid_filename = False
 
-
-        #list containing locations to place ticks
-        tick_locations = [100, 200, 500, 1000, 2000, 5000, 10000]
-
-        fig, ax = plt.subplots()
-        
-        #create list of lines using a list constructor
-        #one line for each band, and using the color for that band
-        #color allocation is same as when showing layout of all the bands using self.display_bands method for easy comparison
-        line_list = [ax.plot(self.band_averages[index].x_data, self.band_averages[index].y_data, label = f"{(self.band_averages[index].scan_name)} Average", color = self.band_colours[index]) for index in range(len(self.band_averages))]
-
-        plt.xscale("log", base = 2)
-
-        ax.xaxis.set_major_locator(tick.FixedLocator(tick_locations))
-
-        ax.xaxis.set_major_formatter(tick.FuncFormatter(lambda x, _: f'{int(x)}'))
-
-        plt.xlabel(self.band_averages[0].x_label_with_unit)
-
-        plt.ylabel(self.band_averages[0].y_label_with_unit)
-
-        plt.title(f"{self.band_averages[0].channel_signal} Band Average Comparison")
-
-        plt.xlim([self.band_averages[0].x_min, 10000])
-
-        #display major grid
-        plt.grid(which="major", color="dimgrey", linewidth=0.5)
-
-        #display minor grid
-        plt.minorticks_on()
-        plt.grid(which="minor", linestyle=":", color="lightgrey", linewidth=1)
-
-        #display a legend for the plot
-        plt.legend(loc = "best")        #change loc to a fixed location eg lower right for faster speed
-
-        #save the plot as a png image, adapted from Kuan Hsien code line for savefig
-        plt.savefig(user_photo_filename, dpi=300, bbox_inches="tight")
-
-        #display the graph
-        plt.show()
+        fig, _ = self.get_band_averages_plot(channel_signal_type)
+        fig.savefig(user_photo_filename, dpi=300, bbox_inches="tight")
+        if not is_GUI:
+            plt.show()
 
 
 
