@@ -224,7 +224,6 @@ class VibroGUI(Tk):
                     self.current_figs.append(fig)
 
                 def build_final_average(kept_items, anomalous_indices):
-                    print(anomalous_indices)
                     if not kept_items:
                         messagebox.showwarning("No points selected", "You excluded every scan point.")
                         return
@@ -316,13 +315,20 @@ class VibroGUI(Tk):
         # Show the page
         self.show_page(page)
 
-    def compare_measurements(self):
-        self.selected_files = filedialog.askopenfilenames(
-                title="Select a *.uff measurement file",
-                filetypes=[("UFF files", "*.uff"), ("All files", "*.*")]
-            )
-        if not self.selected_files:
-            return
+    def compare_measurements(self, is_new_instance=True):
+        if is_new_instance:
+            window = Tk()
+            window.withdraw()
+
+            # ---- UFF file verification ----
+            messagebox.showinfo("Choose Scan Data Measurement Files", "Please hold down CTRL key and select the measurement files with extension .uff of all the scan surfaces from the same device", parent=window)
+
+            self.selected_files = filedialog.askopenfilenames(
+                    title="Select a *.uff measurement file",
+                    filetypes=[("UFF files", "*.uff"), ("All files", "*.*")]
+                )
+            if not self.selected_files:
+                return
 
         try:
             comparison_obj = Compare_Surface_Average(self.selected_files)
@@ -359,13 +365,105 @@ class VibroGUI(Tk):
         graph_id = short_graph_types[graph_types.index(graph_var.get())]
         channel_signal_type = graph_id if unit_var == "raw" else f"{graph_id}_db"
         
-        def compare_action():
-            pass
+        def run():
+            units = unit_var.get()                # "raw" | "db"
+            graph_id = short_graph_types[graph_types.index(graph_var.get())]
+
+            key = graph_id if units == "raw" else f"{graph_id}_db"
+
+            # Create a new frame for the graph page
+            graph_page = tk.Frame(self.container, bg="white")
+            graph_frame = tk.Frame(graph_page)
+            graph_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+            
+            graph_items = []
+            graph_metadata = [None]  # To track {graph_index: measurement_index, scan_point_index}
+
+            for surface_idx, measurement in enumerate(comparison_obj.measurement_list):
+                for sp in measurement.scanpoints:
+                    try:
+                        if units == "raw":
+                            g_obj = getattr(sp, graph_id)
+                        else:
+                            g_obj = getattr(sp, f"create_{graph_id}_decibel")()
+                    except AttributeError:
+                        key = graph_id if units == "raw" else f"{graph_id}_db"
+                        g_obj = getattr(sp, key, None)
+                    if g_obj is None:
+                        continue
+
+                    fig = graph_plotter(g_obj)
+                    graph_items.append(GraphItem(fig, f"Surface {surface_idx} - Point {sp.scan_point_no}"))
+                    graph_metadata.append((surface_idx, graph_id, sp.scan_point_no))
+                    self.current_figs.append(fig)
+           
+            def build_final_average(kept_items, excluded_indices):
+                comparison_obj.average_list.clear()
+                if not kept_items:
+                    messagebox.showwarning("No points selected", "You excluded every graph.")
+                    return
+                # Build anomalous_indices from excluded graph indices
+                anomalous_indices = {}  # {surface_idx: [scan_point_indices]}
+                for idx in excluded_indices:
+                    try:
+                        surface_idx, graph_id, scan_point_no = graph_metadata[idx]
+                        if surface_idx not in anomalous_indices:
+                            anomalous_indices[surface_idx] = []
+                        anomalous_indices[surface_idx].append(scan_point_no)
+                    except IndexError:
+                        continue  # Skip if index is invalid
+
+
+                for surface_idx, surface in enumerate(comparison_obj.measurement_list):
+                    excluded = anomalous_indices.get(surface_idx, [])
+                    try:
+                        avg_graph = surface.get_average(key, anomalous_indices=excluded)
+                        comparison_obj.average_list.append(avg_graph)
+                        comparison_obj.initialize_from_files(is_GUI=True)
+                    except Exception as e:
+                        messagebox.showerror("Averaging Failed",
+                            f"Averaging failed for surface {surface_idx + 1}:\n{str(e)}")
+
+                combined_fig = comparison_obj.create_combined_average_figure()
+                self.current_figs.append(combined_fig)
+
+                # Display in GUI
+                avg_page = tk.Frame(self.container, bg="white")
+                avg_frame = tk.Frame(avg_page, bg="white")
+                avg_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+
+                tk.Label(avg_frame, text="All Averages", bg="white",
+                        font=("Times New Roman", 16, "bold")).pack(pady=(12, 6))
+
+                canvas = FigureCanvasTkAgg(combined_fig, master=avg_frame)
+                canvas.draw()
+                canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+
+                def export_average():
+                    comparison_obj.gui_export()
+
+                tk.Button(avg_frame, text="Back to reviewer",
+                        command=lambda: self.show_page(graph_page),
+                        bg="#4CAF50", fg="white",
+                        font=("Times New Roman", 11, "bold")).pack(pady=10)
+
+                self.add_nav_buttons(avg_page,
+                                    export_callback=export_average,
+                                    back_callback=lambda: self.compare_measurements(False))
+
+                self.show_page(avg_page)
+
+            viewer = PairReviewer(graph_frame, graph_items, build_final_average)
+            viewer.pack(fill="both", expand=True)
+
+            # Add back/export buttons to main graph_page (reviewer)
+            self.add_nav_buttons(graph_page, back_callback=lambda: self.compare_measurements(False))
+            self.show_page(graph_page)
 
         # Run button
         tk.Button(content, text="Run", bg="#4CAF50", fg="white",
                 font=("Times New Roman", 11, "bold"),
-                command=compare_action).pack(side="bottom", pady=(12, 4))
+                command=run).pack(side="bottom", pady=(12, 4))
 
         # Show the page
         self.show_page(page)
@@ -418,7 +516,7 @@ class VibroGUI(Tk):
                         fig = graph_plotter(g_obj)
                         graph_items.append(GraphItem(fig, f"{key.upper()} - Surface {surface_idx}, Point {sp.scan_point_no}"))
                         graph_metadata.append((surface_idx, key, sp.scan_point_no))
-                        self.current_figs.append(fig)
+                        self.current_figs.append(fig)   
                     except Exception as e:
                         print(f"Failed to get graph for {key} at surface {surface_idx} point {sp.scan_point_no}: {e}")
 

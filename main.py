@@ -707,8 +707,8 @@ while not valid:
                                     #raw units
                                     if user_unit_choice == "1":
 
-                                        comparison_obj = Compare_Surface_Average(selected_filepaths, short_graph_types[choice_index])
-                                        comparison_obj.initialize_from_files(f"{short_graph_types[choice_index]}_db")
+                                        comparison_obj = Compare_Surface_Average(selected_filepaths)
+                                        comparison_obj.initialize_from_files(f"{short_graph_types[choice_index]}")
                                         comparison_obj.compare_surface_average_plot()
 
                                     #decibel
@@ -724,14 +724,14 @@ while not valid:
                                     #raw units
                                     if user_unit_choice == "1":
 
-                                        comparison_obj = Compare_Surface_Average(selected_filepaths, short_graph_types[choice_index])
-                                        comparison_obj.initialize_from_files(f"{short_graph_types[choice_index]}_db")
+                                        comparison_obj = Compare_Surface_Average(selected_filepaths)
+                                        comparison_obj.initialize_from_files(f"{short_graph_types[choice_index]}")
                                         comparison_obj.compare_surface_average_export()
 
                                     #decibel
                                     else:
 
-                                        comparison_obj = Compare_Surface_Average(selected_filepaths, f"{short_graph_types[choice_index]}_db")
+                                        comparison_obj = Compare_Surface_Average(selected_filepaths)
                                         comparison_obj.initialize_from_files(f"{short_graph_types[choice_index]}_db")
                                         comparison_obj.compare_surface_average_export()
 
