@@ -1861,6 +1861,7 @@ class Measurement_Plane:
     def bands_layout(self, is_GUI=False):
 
         '''Method to display scatter plot of scan points with each band differentiated by colour'''
+        plt.figure()
 
         #create a counter index to iterate through self.band_colours
         colour_index = 0
@@ -1916,7 +1917,7 @@ class Measurement_Plane:
         if not is_GUI:
             #show plot but allow program to continue executing even when figure is open
             plt.show(block = False)
-            
+
         #use this to get the message box and file dialog to show as top windows later
         window = Tk()
         window.wm_attributes('-topmost', 1)
@@ -2090,14 +2091,16 @@ class Measurement_Plane:
             self.create_bands(channel_signal_type)
 
         #display and save all defined bands
-        self.bands_layout()
+        self.bands_layout(is_GUI)
 
-        self.plot_band_averages(channel_signal_type)
+        if not is_GUI:
+            self.plot_band_averages(channel_signal_type)
 
     def compare_band_averages_export(self, channel_signal_type, is_GUI=False):
 
         '''Method to export band averages.'''
 
+        
         #call band_averages method to update results to self.band_averages attribute
         self.get_band_averages(channel_signal_type, is_GUI)
 
@@ -2220,6 +2223,7 @@ class Measurement_Plane:
         fig.savefig(user_photo_filename, dpi=300, bbox_inches="tight")
         if not is_GUI:
             plt.show()
+        return fig
 
 
 

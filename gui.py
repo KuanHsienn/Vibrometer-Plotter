@@ -560,7 +560,6 @@ class VibroGUI(Tk):
                     export_frame = tk.Frame(export_page, bg="white")
                     export_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
 
-                    measurement.bands_layout()
                     measurement.plot_band_averages(key)
                     combined_fig, ax = measurement.get_band_averages_plot(key)
                     self.current_figs.append(combined_fig)
