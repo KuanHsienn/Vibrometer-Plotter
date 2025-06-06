@@ -1,7 +1,7 @@
 import tkinter as tk
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 from PIL import Image, ImageTk
-
+from Utils.retrieve_files import resource_path
 
 class GraphItem:
     """Hold a (figure, label, included?) triple."""
@@ -16,10 +16,10 @@ class PairReviewer(tk.Frame):
         self.items = items
         self.on_submit = on_submit
         self.page = 0  # 0, 2, 4, …
-        left_arrow = Image.open("Left_Arrow.png")
+        left_arrow = Image.open(resource_path("Left_Arrow.png"))
         left_arrow_resized = left_arrow.resize((75, 75), Image.LANCZOS)  
         self.left_arrow_img = ImageTk.PhotoImage(left_arrow_resized)   
-        right_arrow = Image.open("Right_Arrow.png")
+        right_arrow = Image.open(resource_path("Right_Arrow.png"))
         right_arrow_resized = right_arrow.resize((75, 75), Image.LANCZOS)  
         self.right_arrow_img = ImageTk.PhotoImage(right_arrow_resized)  
 

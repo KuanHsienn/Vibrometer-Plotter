@@ -7,6 +7,7 @@ from device import Device
 from graph_plotter import graph_plotter
 from PIL import Image, ImageTk
 from GUI.pair_reviewer import PairReviewer, GraphItem
+from Utils.retrieve_files import resource_path
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 import matplotlib.pyplot as plt
 
@@ -20,8 +21,6 @@ short_graph_types = [
     "vibref1", "vibref2", "vibref3"
 ]
 
-
-
 class VibroGUI(Tk):
     def __init__(self):
         super().__init__()
@@ -31,7 +30,7 @@ class VibroGUI(Tk):
         self.state("zoomed")
         self.container = tk.Frame(self)
         self.container.pack(expand=True, fill="both")
-        img = Image.open("house.png")
+        img = Image.open(resource_path("house.png"))
         img_resized = img.resize((75, 75), Image.LANCZOS)  
         self.home_img = ImageTk.PhotoImage(img_resized)   
 
@@ -684,7 +683,6 @@ class VibroGUI(Tk):
                     device.graph_list.append(avg_graph)
                     device.remarks_list.append(avg_graph.remarks)
 
-            # You could then export or visualize this
             device.export(is_GUI=True)
 
         viewer = PairReviewer(graph_frame, graph_items, build_final_average)
