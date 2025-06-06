@@ -37,10 +37,19 @@ The application window will launch, allowing you to:
 To distribute the GUI as a standalone executable (no Python install required):
 
 1. Use PyInstaller to build the executable:
+   
+   ``` bash
+   pip install pyinstaller
+   ```
+
+
+   
    ``` bash
    python -m PyInstaller --clean --onefile --windowed gui.py --icon=gui.ico --add-data "house.png;." --add-data "Left_Arrow.png;." --add-data "Right_Arrow.png;."
-2. The executable will be found in the `dist` folder after the build completes
-3. Distribute the `.exe` to users, who can run it directly without installing Python or other dependencies
+   ```
+   
+3. The executable will be found in the `dist` folder after the build completes
+4. Distribute the `.exe` to users, who can run it directly without installing Python or other dependencies
 
 ## Notes on Icons and Assets
 - Icon file (`gui.ico`) should be 256*256 pixels or smaller for best compatibility
