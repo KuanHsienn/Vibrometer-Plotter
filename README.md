@@ -25,4 +25,24 @@ This GUI application provides a user-friendly interface to analyze and visualize
    ```bash
    python gui.py
 
- 
+The application window will launch, allowing you to:
+
+- Load and browse Laser Vibrometer scan files
+- Visualize scan points and bands with color differentiation
+- Annotate points and display anomalous data
+- Export visualizations as high-resolution images
+
+ ## Packaging the GUI as an Executable
+
+To distribute the GUI as a standalone executable (no Python install required):
+
+1. Use PyInstaller to build the executable:
+   ``` bash
+   python -m PyInstaller --clean --onefile --windowed gui.py --icon=gui.ico --add-data "house.png;." --add-data "Left_Arrow.png;." --add-data "Right_Arrow.png;."
+2. The executable will be found in the `dist` folder after the build completes
+3. Distribute the `.exe` to users, who can run it directly without installing Python or other dependencies
+
+## Notes on Icons and Assets
+- Icon file (`gui.ico`) should be 256*256 pixels or smaller for best compatibility
+- Image assets must be included in PyInstaller's `--add-data` option for proper packaging
+- The program references images relative to the executable location to ensure they load correctly
